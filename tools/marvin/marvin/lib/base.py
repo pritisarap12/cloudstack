@@ -1030,6 +1030,12 @@ class Snapshot:
         except Exception as e:
             return [FAIL, e]
 
+    def revertVolToSnapshot(self, apiclient):
+        cmd = revertSnapshot.revertSnapshotCmd()
+        cmd.id = self.id
+        return apiclient.revertSnapshot(cmd)
+
+
 class Template:
     """Manage template life cycle"""
 
@@ -1086,7 +1092,7 @@ class Template:
     @classmethod
     def register(cls, apiclient, services, zoneid=None,
                  account=None, domainid=None, hypervisor=None,
-                 projectid=None, details=None):
+                 projectid=None):
         """Create template from URL"""
 
         # Create template from Virtual machine and Volume ID
@@ -1142,9 +1148,6 @@ class Template:
             cmd.projectid = projectid
         elif "projectid" in services:
             cmd.projectid = services["projectid"]
-
-        if details:
-            cmd.details = details
 
         # Register Template
         template = apiclient.registerTemplate(cmd)

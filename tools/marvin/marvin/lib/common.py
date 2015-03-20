@@ -57,16 +57,16 @@ from marvin.cloudstackAPI import (listConfigurations,
                                   listNetworkOfferings,
                                   listResourceLimits,
                                   listVPCOfferings)
-
-
-
-
 from marvin.sshClient import SshClient
 from marvin.codes import (PASS, FAILED, ISOLATED_NETWORK, VPC_NETWORK,
                           BASIC_ZONE, FAIL, NAT_RULE, STATIC_NAT_RULE,
                           RESOURCE_PRIMARY_STORAGE, RESOURCE_SECONDARY_STORAGE,
                           RESOURCE_CPU, RESOURCE_MEMORY)
-from marvin.lib.utils import (validateList, xsplit, get_process_status)
+from marvin.lib.utils import (validateList, 
+                              xsplit, 
+                              get_process_status,
+                              random_gen,
+                              format_volume_to_ext3)
 from marvin.lib.base import (PhysicalNetwork,
                              PublicIPAddress,
                              NetworkOffering,
@@ -83,9 +83,10 @@ from marvin.lib.base import (PhysicalNetwork,
                              Network,
                              Host,
                              Resources,
-                             Configurations)
+                             Configurations,
+                             Router)
 import random
-
+import hashlib
 
 # Import System modules
 import time
@@ -1395,3 +1396,218 @@ def isNetworkDeleted(apiclient, networkid, timeout=600):
         time.sleep(60)
     #end while
     return networkDeleted
+
+
+def createChecksum(testdata, 
+                   virtual_machine, 
+                   disk, 
+                   disk_type):
+
+    """ Calculate the MD5 checksum of the disk by writing \
+		data on the disk where disk_type is either root disk or data disk 
+	@return: returns the calculated checksum"""
+
+    random_data_0 = random_gen(size=100)
+    # creating checksum(MD5)
+    m = hashlib.md5()
+    m.update(random_data_0)
+    ckecksum_random_data_0 = m.hexdigest()
+    try:
+        ssh_client = SshClient(
+            virtual_machine.ssh_ip,
+            virtual_machine.ssh_port,
+            virtual_machine.username,
+            virtual_machine.password
+        )
+    except Exception: 
+        raise Exception("SSH access failed for server with IP address: %s" %
+                    virtual_machine.ssh_ip)
+
+    # Format partition using ext3
+
+    format_volume_to_ext3(
+        ssh_client,
+        testdata["volume_write_path"][
+            virtual_machine.hypervisor][disk_type]
+    )
+    cmds = ["fdisk -l",
+            "mkdir -p %s" % testdata["data_write_paths"]["mount_dir"],
+            "mount -t ext3 %s1 %s" % (
+                testdata["volume_write_path"][
+                    virtual_machine.hypervisor][disk_type],
+                testdata["data_write_paths"]["mount_dir"]
+            ),
+            "mkdir -p %s/%s/%s " % (
+                testdata["data_write_paths"]["mount_dir"],
+                testdata["data_write_paths"]["sub_dir"],
+                testdata["data_write_paths"]["sub_lvl_dir1"],
+            ),
+            "echo %s > %s/%s/%s/%s" % (
+                random_data_0,
+                testdata["data_write_paths"]["mount_dir"],
+                testdata["data_write_paths"]["sub_dir"],
+                testdata["data_write_paths"]["sub_lvl_dir1"],
+                testdata["data_write_paths"]["random_data"]
+            ),
+            "cat %s/%s/%s/%s" % (
+                testdata["data_write_paths"]["mount_dir"],
+                testdata["data_write_paths"]["sub_dir"],
+                testdata["data_write_paths"]["sub_lvl_dir1"],
+                testdata["data_write_paths"]["random_data"]
+            )
+            ]
+
+    for c in cmds:
+        ssh_client.execute(c)
+
+    # Unmount the storage
+    cmds = [
+        "umount %s" % (testdata["data_write_paths"]["mount_dir"]),
+    ]
+
+    for c in cmds:
+        ssh_client.execute(c)
+
+    return ckecksum_random_data_0
+
+
+def compareChecksum(
+        apiclient,
+        testdata,
+        original_checksum,
+        disk_type,
+        template_id,
+        account_name,
+        account_domainid,
+        service_offering_id,
+        zone_id,
+        zone_networktype,
+        virt_machine=None,
+        disk=None,
+        new_vm=False,
+        ):
+    """
+    Create md5 checksum of the data present on the disk and compare
+    it with the given checksum
+    """
+
+    if disk_type == "datadiskdevice_1" and new_vm:
+        new_virtual_machine = VirtualMachine.create(
+            apiclient,
+            testdata["small"],
+            templateid=template_id,
+            accountid=account_name,
+            domainid=account_domainid,
+            serviceofferingid=service_offering_id,
+            zoneid=zone_id,
+            mode=zone_networktype
+        )
+
+        new_virtual_machine.start(apiclient)
+
+
+        new_virtual_machine.attach_volume(
+            apiclient,
+            disk
+        )
+
+        # Rebooting is required so that newly attached disks are detected
+        new_virtual_machine.reboot(apiclient)
+
+    else:
+        # If the disk is root disk then no need to create new VM
+        # Just start the original machine on which root disk is
+        new_virtual_machine = virt_machine
+        if new_virtual_machine.state != "Running":
+            new_virtual_machine.start(apiclient)
+
+    try:
+        # Login to VM to verify test directories and files
+
+        ssh = SshClient(
+            new_virtual_machine.ssh_ip,
+            new_virtual_machine.ssh_port,
+            new_virtual_machine.username,
+            new_virtual_machine.password
+        )
+    except Exception:
+        raise Exception("SSH access failed for server with IP address: %s" %
+                    new_virtual_machine.ssh_ip)
+
+    # Mount datadiskdevice_1 because this is the first data disk of the new
+    # virtual machine
+    cmds = ["blkid",
+            "fdisk -l",
+            "mkdir -p %s" % testdata["data_write_paths"]["mount_dir"],
+            "mount -t ext3 %s1 %s" % (
+                testdata["volume_write_path"][
+                    new_virtual_machine.hypervisor][disk_type],
+                testdata["data_write_paths"]["mount_dir"]
+            ),
+            ]
+
+    for c in cmds:
+        ssh.execute(c)
+
+    returned_data_0 = ssh.execute(
+        "cat %s/%s/%s/%s" % (
+            testdata["data_write_paths"]["mount_dir"],
+            testdata["data_write_paths"]["sub_dir"],
+            testdata["data_write_paths"]["sub_lvl_dir1"],
+            testdata["data_write_paths"]["random_data"]
+        ))
+
+    n = hashlib.md5()
+    n.update(returned_data_0[0])
+    ckecksum_returned_data_0 = n.hexdigest()
+
+
+    # Verify returned data
+    assert original_checksum == ckecksum_returned_data_0, \
+        "Cheskum does not match with checksum of original data"
+
+    # Unmount the Sec Storage
+    cmds = [
+        "umount %s" % (testdata["data_write_paths"]["mount_dir"]),
+    ]
+
+    for c in cmds:
+        ssh.execute(c)
+
+    if new_vm:
+        new_virtual_machine.detach_volume(
+            apiclient,
+            disk
+        )
+
+        new_virtual_machine.delete(apiclient)
+
+    return
+
+
+def verifyRouterState(apiclient, routerid, state, listall=True):
+    """List router and check if the router state matches the given state"""
+    retriesCount = 10
+    isRouterInDesiredState = False
+    exceptionOccured = False
+    exceptionMessage = ""
+    try:
+        while retriesCount >= 0:
+            routers = Router.list(apiclient, id=routerid, listall=listall)
+            assert validateList(
+                routers)[0] == PASS, "Routers list validation failed"
+            if str(routers[0].state).lower() == state:
+                isRouterInDesiredState = True
+                break
+            retriesCount -= 1
+            time.sleep(60)
+        if not isRouterInDesiredState:
+            exceptionMessage = "Router state should be %s, it is %s" %\
+                                (state, routers[0].state)
+    except Exception as e:
+        exceptionOccured = True
+        exceptionMessage = e
+        return [exceptionOccured, isRouterInDesiredState, exceptionMessage]
+    return [exceptionOccured, isRouterInDesiredState, exceptionMessage]
+
+
