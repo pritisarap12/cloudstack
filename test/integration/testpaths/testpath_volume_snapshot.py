@@ -415,14 +415,7 @@ class TestVolumeSnapshot(cloudstackTestCase):
             self.testdata,
             ckecksum_random_root_cluster,
             "rootdiskdevice",
-            self.template.id,
-            self.account.name,
-            self.account.domainid,
-            self.service_offering.id,
-            self.zone.id,
-            self.zone.networktype,
-            virt_machine=vm_from_temp,
-            disk=None,
+            virt_machine=vm_from_temp
         )
         vm_from_temp.delete(self.apiclient)
         # Step 4
@@ -526,14 +519,7 @@ class TestVolumeSnapshot(cloudstackTestCase):
             self.testdata,
             ckecksum_random_root_cluster,
             "rootdiskdevice",
-            self.template.id,
-            self.account.name,
-            self.account.domainid,
-            self.service_offering.id,
-            self.zone.id,
-            self.zone.networktype,
-            virt_machine=vm_from_temp_2,
-            disk=None,
+            virt_machine=vm_from_temp_2
         )
 
         vm_from_temp_2.delete(self.apiclient)
@@ -588,14 +574,7 @@ class TestVolumeSnapshot(cloudstackTestCase):
                 self.testdata,
                 ckecksum_random_root_cluster,
                 "rootdiskdevice",
-                self.template.id,
-                self.account.name,
-                self.account.domainid,
-                self.service_offering.id,
-                self.zone.id,
-                self.zone.networktype,
-                virt_machine=vm_from_temp,
-                disk=None,
+                virt_machine=vm_from_temp
             )
             vm_from_temp.delete(self.apiclient)
             templateFromSnapshot.delete(self.apiclient)
@@ -647,14 +626,7 @@ class TestVolumeSnapshot(cloudstackTestCase):
                 self.testdata,
                 ckecksum_random_root_cluster,
                 "rootdiskdevice",
-                self.template.id,
-                self.account.name,
-                self.account.domainid,
-                self.service_offering.id,
-                self.zone.id,
-                self.zone.networktype,
-                virt_machine=vm_from_temp,
-                disk=None,
+                virt_machine=vm_from_temp
             )
 
             templateFromSnapshot.delete(self.apiclient)
@@ -734,14 +706,7 @@ class TestVolumeSnapshot(cloudstackTestCase):
             self.testdata,
             ckecksum_root_cluster,
             "rootdiskdevice",
-            self.template.id,
-            self.account.name,
-            self.account.domainid,
-            self.service_offering.id,
-            self.zone.id,
-            self.zone.networktype,
-            virt_machine=vm_from_temp_2,
-            disk=None
+            virt_machine=vm_from_temp_2
         )
 
         vm_from_temp_2.delete(self.apiclient)
@@ -882,14 +847,7 @@ class TestVolumeSnapshot(cloudstackTestCase):
             self.testdata,
             ckecksum_data_disk,
             "datadiskdevice_1",
-            self.template.id,
-            self.account.name,
-            self.account.domainid,
-            self.service_offering.id,
-            self.zone.id,
-            self.zone.networktype,
-            virt_machine=new_vm,
-            disk=volumeFromSnap
+            virt_machine=new_vm
         )
 
         # Step 12
@@ -997,14 +955,7 @@ class TestVolumeSnapshot(cloudstackTestCase):
             self.testdata,
             checksum_data_2,
             "datadiskdevice_2",
-            self.template.id,
-            self.account.name,
-            self.account.domainid,
-            self.service_offering.id,
-            self.zone.id,
-            self.zone.networktype,
-            virt_machine=self.vm_2,
-            disk=volumeFromSnap_2
+            virt_machine=self.vm_2
         )
 
         # Step 14

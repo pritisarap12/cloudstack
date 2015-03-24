@@ -1476,63 +1476,26 @@ def compareChecksum(
         testdata,
         original_checksum,
         disk_type,
-        template_id,
-        account_name,
-        account_domainid,
-        service_offering_id,
-        zone_id,
-        zone_networktype,
-        virt_machine=None,
-        disk=None,
-        new_vm=False,
+        virt_machine
         ):
     """
     Create md5 checksum of the data present on the disk and compare
     it with the given checksum
     """
-
-    if disk_type == "datadiskdevice_1" and new_vm:
-        new_virtual_machine = VirtualMachine.create(
-            apiclient,
-            testdata["small"],
-            templateid=template_id,
-            accountid=account_name,
-            domainid=account_domainid,
-            serviceofferingid=service_offering_id,
-            zoneid=zone_id,
-            mode=zone_networktype
-        )
-
-        new_virtual_machine.start(apiclient)
-
-
-        new_virtual_machine.attach_volume(
-            apiclient,
-            disk
-        )
-
-        # Rebooting is required so that newly attached disks are detected
-        new_virtual_machine.reboot(apiclient)
-
-    else:
-        # If the disk is root disk then no need to create new VM
-        # Just start the original machine on which root disk is
-        new_virtual_machine = virt_machine
-        if new_virtual_machine.state != "Running":
-            new_virtual_machine.start(apiclient)
+    if virt_machine.state != "Running":
+        virt_machine.start(apiclient)
 
     try:
         # Login to VM to verify test directories and files
-
         ssh = SshClient(
-            new_virtual_machine.ssh_ip,
-            new_virtual_machine.ssh_port,
-            new_virtual_machine.username,
-            new_virtual_machine.password
+            virt_machine.ssh_ip,
+            virt_machine.ssh_port,
+            virt_machine.username,
+            virt_machine.password
         )
     except Exception:
         raise Exception("SSH access failed for server with IP address: %s" %
-                    new_virtual_machine.ssh_ip)
+                    virt_machine.ssh_ip)
 
     # Mount datadiskdevice_1 because this is the first data disk of the new
     # virtual machine
@@ -1541,7 +1504,7 @@ def compareChecksum(
             "mkdir -p %s" % testdata["data_write_paths"]["mount_dir"],
             "mount -t ext3 %s1 %s" % (
                 testdata["volume_write_path"][
-                    new_virtual_machine.hypervisor][disk_type],
+                    virt_machine.hypervisor][disk_type],
                 testdata["data_write_paths"]["mount_dir"]
             ),
             ]
@@ -1561,7 +1524,6 @@ def compareChecksum(
     n.update(returned_data_0[0])
     ckecksum_returned_data_0 = n.hexdigest()
 
-
     # Verify returned data
     assert original_checksum == ckecksum_returned_data_0, \
         "Cheskum does not match with checksum of original data"
@@ -1574,40 +1536,4 @@ def compareChecksum(
     for c in cmds:
         ssh.execute(c)
 
-    if new_vm:
-        new_virtual_machine.detach_volume(
-            apiclient,
-            disk
-        )
-
-        new_virtual_machine.delete(apiclient)
-
     return
-
-
-def verifyRouterState(apiclient, routerid, state, listall=True):
-    """List router and check if the router state matches the given state"""
-    retriesCount = 10
-    isRouterInDesiredState = False
-    exceptionOccured = False
-    exceptionMessage = ""
-    try:
-        while retriesCount >= 0:
-            routers = Router.list(apiclient, id=routerid, listall=listall)
-            assert validateList(
-                routers)[0] == PASS, "Routers list validation failed"
-            if str(routers[0].state).lower() == state:
-                isRouterInDesiredState = True
-                break
-            retriesCount -= 1
-            time.sleep(60)
-        if not isRouterInDesiredState:
-            exceptionMessage = "Router state should be %s, it is %s" %\
-                                (state, routers[0].state)
-    except Exception as e:
-        exceptionOccured = True
-        exceptionMessage = e
-        return [exceptionOccured, isRouterInDesiredState, exceptionMessage]
-    return [exceptionOccured, isRouterInDesiredState, exceptionMessage]
-
-
