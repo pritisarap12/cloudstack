@@ -84,7 +84,7 @@ from marvin.lib.base import (PhysicalNetwork,
                              Host,
                              Resources,
                              Configurations,
-                             Router)
+                             )
 import random
 import hashlib
 
@@ -1398,10 +1398,10 @@ def isNetworkDeleted(apiclient, networkid, timeout=600):
     return networkDeleted
 
 
-def createChecksum(testdata, 
-                   virtual_machine, 
-                   disk, 
-                   disk_type):
+def createChecksum(service=None, 
+                   virtual_machine=None, 
+                   disk=None, 
+                   disk_type=None):
 
     """ Calculate the MD5 checksum of the disk by writing \
 		data on the disk where disk_type is either root disk or data disk 
@@ -1427,33 +1427,33 @@ def createChecksum(testdata,
 
     format_volume_to_ext3(
         ssh_client,
-        testdata["volume_write_path"][
+        service["volume_write_path"][
             virtual_machine.hypervisor][disk_type]
     )
     cmds = ["fdisk -l",
-            "mkdir -p %s" % testdata["data_write_paths"]["mount_dir"],
+            "mkdir -p %s" % service["data_write_paths"]["mount_dir"],
             "mount -t ext3 %s1 %s" % (
-                testdata["volume_write_path"][
+                service["volume_write_path"][
                     virtual_machine.hypervisor][disk_type],
-                testdata["data_write_paths"]["mount_dir"]
+                service["data_write_paths"]["mount_dir"]
             ),
             "mkdir -p %s/%s/%s " % (
-                testdata["data_write_paths"]["mount_dir"],
-                testdata["data_write_paths"]["sub_dir"],
-                testdata["data_write_paths"]["sub_lvl_dir1"],
+                service["data_write_paths"]["mount_dir"],
+                service["data_write_paths"]["sub_dir"],
+                service["data_write_paths"]["sub_lvl_dir1"],
             ),
             "echo %s > %s/%s/%s/%s" % (
                 random_data_0,
-                testdata["data_write_paths"]["mount_dir"],
-                testdata["data_write_paths"]["sub_dir"],
-                testdata["data_write_paths"]["sub_lvl_dir1"],
-                testdata["data_write_paths"]["random_data"]
+                service["data_write_paths"]["mount_dir"],
+                service["data_write_paths"]["sub_dir"],
+                service["data_write_paths"]["sub_lvl_dir1"],
+                service["data_write_paths"]["random_data"]
             ),
             "cat %s/%s/%s/%s" % (
-                testdata["data_write_paths"]["mount_dir"],
-                testdata["data_write_paths"]["sub_dir"],
-                testdata["data_write_paths"]["sub_lvl_dir1"],
-                testdata["data_write_paths"]["random_data"]
+                service["data_write_paths"]["mount_dir"],
+                service["data_write_paths"]["sub_dir"],
+                service["data_write_paths"]["sub_lvl_dir1"],
+                service["data_write_paths"]["random_data"]
             )
             ]
 
@@ -1462,7 +1462,7 @@ def createChecksum(testdata,
 
     # Unmount the storage
     cmds = [
-        "umount %s" % (testdata["data_write_paths"]["mount_dir"]),
+        "umount %s" % (service["data_write_paths"]["mount_dir"]),
     ]
 
     for c in cmds:
@@ -1473,10 +1473,10 @@ def createChecksum(testdata,
 
 def compareChecksum(
         apiclient,
-        testdata,
-        original_checksum,
-        disk_type,
-        virt_machine
+        service=None,
+        original_checksum=None,
+        disk_type=None,
+        virt_machine=None
         ):
     """
     Create md5 checksum of the data present on the disk and compare
@@ -1501,11 +1501,11 @@ def compareChecksum(
     # virtual machine
     cmds = ["blkid",
             "fdisk -l",
-            "mkdir -p %s" % testdata["data_write_paths"]["mount_dir"],
+            "mkdir -p %s" % service["data_write_paths"]["mount_dir"],
             "mount -t ext3 %s1 %s" % (
-                testdata["volume_write_path"][
+                service["volume_write_path"][
                     virt_machine.hypervisor][disk_type],
-                testdata["data_write_paths"]["mount_dir"]
+                service["data_write_paths"]["mount_dir"]
             ),
             ]
 
@@ -1514,10 +1514,10 @@ def compareChecksum(
 
     returned_data_0 = ssh.execute(
         "cat %s/%s/%s/%s" % (
-            testdata["data_write_paths"]["mount_dir"],
-            testdata["data_write_paths"]["sub_dir"],
-            testdata["data_write_paths"]["sub_lvl_dir1"],
-            testdata["data_write_paths"]["random_data"]
+            service["data_write_paths"]["mount_dir"],
+            service["data_write_paths"]["sub_dir"],
+            service["data_write_paths"]["sub_lvl_dir1"],
+            service["data_write_paths"]["random_data"]
         ))
 
     n = hashlib.md5()
@@ -1530,7 +1530,7 @@ def compareChecksum(
 
     # Unmount the Sec Storage
     cmds = [
-        "umount %s" % (testdata["data_write_paths"]["mount_dir"]),
+        "umount %s" % (service["data_write_paths"]["mount_dir"]),
     ]
 
     for c in cmds:
