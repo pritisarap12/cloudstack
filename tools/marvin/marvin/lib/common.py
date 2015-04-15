@@ -1739,3 +1739,143 @@ def verifyVCenterPortGroups(
     except Exception as e:
         return [FAIL, e]
     return [PASS, None]
+
+def createChecksum(service=None, 
+                   virtual_machine=None, 
+                   disk=None, 
+                   disk_type=None):
+
+    """ Calculate the MD5 checksum of the disk by writing \
+		data on the disk where disk_type is either root disk or data disk 
+	@return: returns the calculated checksum"""
+
+    random_data_0 = random_gen(size=100)
+    # creating checksum(MD5)
+    m = hashlib.md5()
+    m.update(random_data_0)
+    ckecksum_random_data_0 = m.hexdigest()
+    try:
+        ssh_client = SshClient(
+            virtual_machine.ssh_ip,
+            virtual_machine.ssh_port,
+            virtual_machine.username,
+            virtual_machine.password
+        )
+    except Exception: 
+        raise Exception("SSH access failed for server with IP address: %s" %
+                    virtual_machine.ssh_ip)
+
+    # Format partition using ext3
+
+    format_volume_to_ext3(
+        ssh_client,
+        service["volume_write_path"][
+            virtual_machine.hypervisor][disk_type]
+    )
+    cmds = ["fdisk -l",
+            "mkdir -p %s" % service["data_write_paths"]["mount_dir"],
+            "mount -t ext3 %s1 %s" % (
+                service["volume_write_path"][
+                    virtual_machine.hypervisor][disk_type],
+                service["data_write_paths"]["mount_dir"]
+            ),
+            "mkdir -p %s/%s/%s " % (
+                service["data_write_paths"]["mount_dir"],
+                service["data_write_paths"]["sub_dir"],
+                service["data_write_paths"]["sub_lvl_dir1"],
+            ),
+            "echo %s > %s/%s/%s/%s" % (
+                random_data_0,
+                service["data_write_paths"]["mount_dir"],
+                service["data_write_paths"]["sub_dir"],
+                service["data_write_paths"]["sub_lvl_dir1"],
+                service["data_write_paths"]["random_data"]
+            ),
+            "cat %s/%s/%s/%s" % (
+                service["data_write_paths"]["mount_dir"],
+                service["data_write_paths"]["sub_dir"],
+                service["data_write_paths"]["sub_lvl_dir1"],
+                service["data_write_paths"]["random_data"]
+            )
+            ]
+
+    for c in cmds:
+        ssh_client.execute(c)
+
+    # Unmount the storage
+    cmds = [
+        "umount %s" % (service["data_write_paths"]["mount_dir"]),
+    ]
+
+    for c in cmds:
+        ssh_client.execute(c)
+
+    return ckecksum_random_data_0
+
+
+def compareChecksum(
+        apiclient,
+        service=None,
+        original_checksum=None,
+        disk_type=None,
+        virt_machine=None
+        ):
+    """
+    Create md5 checksum of the data present on the disk and compare
+    it with the given checksum
+    """
+    if virt_machine.state != "Running":
+        virt_machine.start(apiclient)
+
+    try:
+        # Login to VM to verify test directories and files
+        ssh = SshClient(
+            virt_machine.ssh_ip,
+            virt_machine.ssh_port,
+            virt_machine.username,
+            virt_machine.password
+        )
+    except Exception:
+        raise Exception("SSH access failed for server with IP address: %s" %
+                    virt_machine.ssh_ip)
+
+    # Mount datadiskdevice_1 because this is the first data disk of the new
+    # virtual machine
+    cmds = ["blkid",
+            "fdisk -l",
+            "mkdir -p %s" % service["data_write_paths"]["mount_dir"],
+            "mount -t ext3 %s1 %s" % (
+                service["volume_write_path"][
+                    virt_machine.hypervisor][disk_type],
+                service["data_write_paths"]["mount_dir"]
+            ),
+            ]
+
+    for c in cmds:
+        ssh.execute(c)
+
+    returned_data_0 = ssh.execute(
+        "cat %s/%s/%s/%s" % (
+            service["data_write_paths"]["mount_dir"],
+            service["data_write_paths"]["sub_dir"],
+            service["data_write_paths"]["sub_lvl_dir1"],
+            service["data_write_paths"]["random_data"]
+        ))
+
+    n = hashlib.md5()
+    n.update(returned_data_0[0])
+    ckecksum_returned_data_0 = n.hexdigest()
+
+    # Verify returned data
+    assert original_checksum == ckecksum_returned_data_0, \
+        "Cheskum does not match with checksum of original data"
+
+    # Unmount the Sec Storage
+    cmds = [
+        "umount %s" % (service["data_write_paths"]["mount_dir"]),
+    ]
+
+    for c in cmds:
+        ssh.execute(c)
+
+    return

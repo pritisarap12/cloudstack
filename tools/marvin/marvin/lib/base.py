@@ -1158,7 +1158,7 @@ class Template:
         elif "projectid" in services:
             cmd.projectid = services["projectid"]
 
-        if details:
+	if details:
             cmd.details = details
 
         # Register Template
