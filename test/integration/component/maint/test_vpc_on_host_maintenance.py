@@ -233,7 +233,7 @@ class TestVPCHostMaintenance(cloudstackTestCase):
         self.debug("VPC network validated - %s" % network.name)
         return
 
-    @attr(tags=["advanced", "intervlan"])
+    @attr(tags=["invalid"])
     def test_01_create_vpc_host_maintenance(self):
         """ Test VPC when host is in maintenance mode
         """
@@ -258,7 +258,7 @@ class TestVPCHostMaintenance(cloudstackTestCase):
         self.validate_vpc_network(vpc, state='inactive')
         return
 
-    @attr(tags=["advanced", "intervlan"])
+    @attr(tags=["invalid"])
     def test_02_create_vpc_wait_gc(self):
         """ Test VPC when host is in maintenance mode and wait till nw gc
         """
